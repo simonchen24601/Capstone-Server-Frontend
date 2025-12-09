@@ -20,7 +20,7 @@
           <el-descriptions-item label="Humidity">
             {{ Number(latest.humidity_percent).toFixed(2) }} %
           </el-descriptions-item>
-          <el-descriptions-item label="Timestamp">
+          <el-descriptions-item label="Sample Time">
             {{ formatTimestamp(latest.timestamp) }}
           </el-descriptions-item>
           <el-descriptions-item label="Record ID">
@@ -87,6 +87,7 @@ function formatTimestamp(ts) {
   if (!ts) return ''
   const d = new Date(ts)
   if (isNaN(d.getTime())) return ts
+  // Origin timestamp is UTC; render in UTC for clarity
   return new Intl.DateTimeFormat(undefined, {
     year: 'numeric',
     month: 'short',
@@ -95,6 +96,7 @@ function formatTimestamp(ts) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
+    timeZone: 'UTC',
     timeZoneName: 'short'
   }).format(d)
 }
@@ -220,7 +222,7 @@ function updateHumChart(times, hums) {
   margin-top: 16px;
 }
 .chart {
-  width: 100%;
+  width: 500px;
   height: 300px;
 }
 </style>
