@@ -25,6 +25,38 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
+## HTTP with Axios
+
+Axios is included as a dependency. Install packages:
+
+```bash
+npm install
+```
+
+Quick usage example in a Vue component:
+
+```js
+import axios from 'axios'
+
+export default {
+  async mounted() {
+    const { data } = await axios.get('/api/health')
+    console.log('API health:', data)
+  }
+}
+```
+
+You can also create a shared client in `src/api.js`:
+
+```js
+import axios from 'axios'
+
+export const api = axios.create({
+  baseURL: '/api',
+  timeout: 10000
+})
+```
+
 ### Compile and Hot-Reload for Development
 
 ```sh
