@@ -47,6 +47,17 @@
           <div ref="humChartRef" class="chart"></div>
         </el-card>
       </div>
+      <el-card shadow="always" class="card" style="margin-top: 16px;">
+        <template #header>
+          <div class="card-header">
+            <span>Latest Screenshot</span>
+          </div>
+        </template>
+        <div class="screenshot">
+          <el-empty v-if="!screenshotUrl" description="No screenshot" />
+          <img v-else :src="screenshotUrl" alt="Latest screenshot" class="screenshot-img" />
+        </div>
+      </el-card>
     </section>
   </div>
 </template>
@@ -55,13 +66,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { getTemperatureLatest, getTemperatureList } from '../api.js'
+import { getTemperatureLatest, getTemperatureList, getScreenshotLatest } from '../api.js'
 
 const latest = ref(null)
 const tempChartRef = ref(null)
 const humChartRef = ref(null)
 let tempChart = null
 let humChart = null
+const screenshotUrl = ref('')
 
 async function loadLatest() {
   const apiKey = localStorage.getItem('apiKey') || ''
@@ -113,6 +125,7 @@ onMounted(() => {
   refreshTimer = setInterval(() => {
     loadLatest()
     loadHistory()
+    loadLatestScreenshot()
   }, 10000)
 })
 
@@ -179,6 +192,28 @@ function updateHumChart(times, hums) {
   }
   humChart.setOption(option)
 }
+
+async function loadLatestScreenshot() {
+  const apiKey = localStorage.getItem('apiKey') || ''
+  const deviceKey = localStorage.getItem('selectedDeviceKey') || localStorage.getItem('selectedDeviceName') || localStorage.getItem('selectedDeviceId') || ''
+  if (!apiKey) return
+  try {
+    const params = deviceKey ? { device_key: deviceKey } : {}
+    const res = await getScreenshotLatest(params, {
+      headers: { 'X-API-Key': apiKey }
+    })
+    const blob = res.data
+    if (blob && blob.size > 0) {
+      // revoke old URL
+      if (screenshotUrl.value) URL.revokeObjectURL(screenshotUrl.value)
+      screenshotUrl.value = URL.createObjectURL(blob)
+    } else {
+      screenshotUrl.value = ''
+    }
+  } catch (e) {
+    screenshotUrl.value = ''
+  }
+}
  
     function maskKey(val) {
       if (!val || typeof val !== 'string') return ''
@@ -217,6 +252,19 @@ function updateHumChart(times, hums) {
 }
 .charts {
   display: grid;
+.screenshot {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+.screenshot-img {
+  max-width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  display: block;
+}
   grid-template-columns: 1fr;
   gap: 16px;
   margin-top: 16px;

@@ -50,3 +50,26 @@ export const getTemperatureById = (id, config = {}) =>
 // Get the latest record; optional device_id filter
 export const getTemperatureLatest = (params = {}, config = {}) =>
   api.get('/sensor/temperature/latest', { ...config, params })
+
+// Screenshot APIs
+// Create a screenshot via multipart/form-data
+export const postScreenshot = async ({ device_id, format, image }, config = {}) => {
+  const fd = new FormData()
+  if (device_id) fd.append('device_id', device_id)
+  if (format) fd.append('format', format)
+  if (image) fd.append('image', image)
+  const headers = { ...(config.headers || {}), 'Content-Type': 'multipart/form-data' }
+  return api.post('/sensor/screenshot', fd, { ...config, headers })
+}
+
+// List latest 100 screenshot metadata; optional device_id filter
+export const getScreenshotList = (params = {}, config = {}) =>
+  api.get('/sensor/screenshot', { ...config, params })
+
+// Get raw binary screenshot by id; returns Blob
+export const getScreenshotById = (id, config = {}) =>
+  api.get(`/sensor/screenshot/${id}`, { ...config, responseType: 'blob' })
+
+// Get latest screenshot (binary)
+export const getScreenshotLatest = (params = {}, config = {}) =>
+  api.get('/sensor/screenshot/latest', { ...config, params, responseType: 'blob' })
