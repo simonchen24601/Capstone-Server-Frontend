@@ -1,9 +1,6 @@
 <template>
   <div class="main-page">
-    <header class="toolbar">
-      <el-input v-model="search" placeholder="Search..." clearable style="max-width: 320px;" />
-      <el-button type="primary" @click="refresh">Refresh</el-button>
-    </header>
+    <!-- toolbar removed -->
 
     <section class="content">
       <el-card shadow="hover" class="card">
@@ -15,16 +12,16 @@
         </template>
         <el-descriptions v-if="latest" :column="1" border>
           <el-descriptions-item label="Device Key">
-            {{ latest.device_key || latest.device_id }}
+            {{ maskKey(latest.device_key || latest.device_id) }}
           </el-descriptions-item>
-          <el-descriptions-item label="Temperature (°C)">
-            {{ latest.temperature_celsius }}
+          <el-descriptions-item label="Temperature">
+            {{ Number(latest.temperature_celsius).toFixed(2) }} °C
           </el-descriptions-item>
           <el-descriptions-item label="Humidity">
             {{ Number(latest.humidity_percent).toFixed(2) }} %
           </el-descriptions-item>
           <el-descriptions-item label="Timestamp">
-            {{ latest.timestamp }}
+            {{ formatTimestamp(latest.timestamp) }}
           </el-descriptions-item>
           <el-descriptions-item label="Record ID">
             {{ latest.id }}
@@ -32,6 +29,24 @@
         </el-descriptions>
         <el-empty v-else description="No latest record" />
       </el-card>
+      <div class="charts">
+        <el-card shadow="always" class="card">
+          <template #header>
+            <div class="card-header">
+              <span>Temperature History</span>
+            </div>
+          </template>
+          <div ref="tempChartRef" class="chart"></div>
+        </el-card>
+        <el-card shadow="always" class="card">
+          <template #header>
+            <div class="card-header">
+              <span>Humidity History</span>
+            </div>
+          </template>
+          <div ref="humChartRef" class="chart"></div>
+        </el-card>
+      </div>
     </section>
   </div>
 </template>
@@ -39,10 +54,14 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getTemperatureLatest } from '../api.js'
+import * as echarts from 'echarts'
+import { getTemperatureLatest, getTemperatureList } from '../api.js'
 
-const search = ref('')
 const latest = ref(null)
+const tempChartRef = ref(null)
+const humChartRef = ref(null)
+let tempChart = null
+let humChart = null
 
 async function loadLatest() {
   const apiKey = localStorage.getItem('apiKey') || ''
@@ -64,12 +83,26 @@ async function loadLatest() {
   }
 }
 
-function refresh() {
-  loadLatest()
+function formatTimestamp(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return ts
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'short'
+  }).format(d)
 }
 
 onMounted(() => {
   loadLatest()
+  initCharts()
+  loadHistory()
 })
 
 // Auto-refresh every 10 seconds
@@ -77,6 +110,7 @@ let refreshTimer = null
 onMounted(() => {
   refreshTimer = setInterval(() => {
     loadLatest()
+    loadHistory()
   }, 10000)
 })
 
@@ -86,6 +120,73 @@ onUnmounted(() => {
     refreshTimer = null
   }
 })
+
+async function loadHistory() {
+  const apiKey = localStorage.getItem('apiKey') || ''
+  const deviceKey = localStorage.getItem('selectedDeviceKey') || localStorage.getItem('selectedDeviceName') || localStorage.getItem('selectedDeviceId') || ''
+  if (!apiKey) return
+  try {
+    const params = deviceKey ? { device_key: deviceKey } : {}
+    const { data } = await getTemperatureList(params, {
+      headers: { 'X-API-Key': apiKey }
+    })
+    const records = Array.isArray(data) ? data : []
+    const times = records.map(r => r.timestamp)
+    const temps = records.map(r => Number(r.temperature_celsius))
+    const hums = records.map(r => Number(r.humidity_percent))
+    updateTempChart(times, temps)
+    updateHumChart(times, hums)
+  } catch (e) {
+    // silently ignore
+  }
+}
+
+function initCharts() {
+  if (tempChartRef.value && !tempChart) {
+    tempChart = echarts.init(tempChartRef.value)
+  }
+  if (humChartRef.value && !humChart) {
+    humChart = echarts.init(humChartRef.value)
+  }
+  window.addEventListener('resize', handleResize)
+}
+
+function handleResize() {
+  tempChart && tempChart.resize()
+  humChart && humChart.resize()
+}
+
+function updateTempChart(times, temps) {
+  if (!tempChart) return
+  const option = {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: times },
+    yAxis: { type: 'value', name: '°C' },
+    series: [{ name: 'Temperature', type: 'line', data: temps, smooth: true }]
+  }
+  tempChart.setOption(option)
+}
+
+function updateHumChart(times, hums) {
+  if (!humChart) return
+  const option = {
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: times },
+    yAxis: { type: 'value', name: '%' },
+    series: [{ name: 'Humidity', type: 'line', data: hums, smooth: true }]
+  }
+  humChart.setOption(option)
+}
+ 
+    function maskKey(val) {
+      if (!val || typeof val !== 'string') return ''
+      const s = val.trim()
+      if (s.length <= 8) return s
+      const start = s.slice(0, 4)
+      const end = s.slice(-4)
+      return `${start}****************************************${end}`
+    }
+
 </script>
 
 <style scoped>
@@ -102,13 +203,24 @@ onUnmounted(() => {
 }
 .content {
   flex: 1;
+  width: 100%;
 }
 .card {
-  max-width: 800px;
+  width: 100%;
 }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.charts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.chart {
+  width: 100%;
+  height: 300px;
 }
 </style>

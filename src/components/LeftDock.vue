@@ -81,6 +81,9 @@ function selectDevice(index) {
   padding: 12px;
   border-right: 1px solid var(--vt-c-divider);
   background: var(--vt-c-black-mute);
+  position: sticky;
+  top: 0;
+  overflow: auto;
 }
 .title {
   font-weight: 600;
@@ -95,7 +98,7 @@ function selectDevice(index) {
   margin-bottom: 12px;
 }
 .devices {
-  overflow: auto;
+  overflow: autovue;
   max-height: calc(100vh - 100px);
 }
 </style>
